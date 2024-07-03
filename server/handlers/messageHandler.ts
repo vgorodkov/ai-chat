@@ -1,5 +1,5 @@
 import { processAIResponse } from 'services/ollamaService';
-import { getSession } from 'services/sessionManager';
+import { getSession } from 'services/sessionService';
 import { createFullPrompt } from 'utils/createFullPrompt';
 import { sendToClient } from 'utils/sendToClient';
 import WebSocket from 'ws';

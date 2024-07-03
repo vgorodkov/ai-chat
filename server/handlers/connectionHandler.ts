@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 
-import { initializeSession } from 'services/sessionManager';
+import { initializeSession } from 'services/sessionService';
 import { handleMessage } from './messageHandler';
 import { handleClose } from './closeConnectionHandler';
 
