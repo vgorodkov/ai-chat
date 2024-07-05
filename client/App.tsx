@@ -1,100 +1,84 @@
-import React, { useEffect, useState } from 'react';
-import { Button, StyleSheet, TextInput, View } from 'react-native';
-import { ChatRole } from './src/constants/chat';
-import { ChatMessage } from './src/types/chat';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  FlatList,
+  Keyboard,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+} from 'react-native';
 import { ChatList } from '@/components/ChatList';
-
-const IP = '192.168.100.19';
+import { colors } from '@/constants/colors';
+import { PromptInput } from '@/components/PromptInput';
+import { useChatMessages } from '@/hooks/useChatMessages';
+import { StatusBar } from 'expo-status-bar';
+import { spacings } from '@/constants/layout';
+import { Typography } from '@/components/UI';
 
 export default function App() {
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const { chatMessages, sendUserMessage, isLoading, connectionStatus } =
+    useChatMessages();
   const [promptQuery, setPromptQuery] = useState('');
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const chatListRef = useRef<FlatList | null>(null);
 
-  const updateChatMessages = (newMessage: string) => {
-    setChatMessages((prev) => {
-      const chatLength = prev.length;
-      if (chatLength > 0 && prev[chatLength - 1].author === ChatRole.AI) {
-        let updatedChat = [...prev];
-        updatedChat[chatLength - 1].message += newMessage;
-        return updatedChat;
-      } else {
-        return [...prev, { author: ChatRole.AI, message: newMessage }];
-      }
-    });
+  const scrollToEnd = () => {
+    chatListRef.current?.scrollToEnd();
   };
 
-  useEffect(() => {
-    const socket = new WebSocket(`ws://${IP}:8080`);
-
-    socket.onopen = () => {
-      console.log('WebSocket connection opened');
-    };
-
-    socket.onmessage = (event) => {
-      try {
-        const res = JSON.parse(event.data);
-        switch (res.event) {
-          case 'TYPING':
-            updateChatMessages(res.message);
-            break;
-          case 'DONE':
-            console.log('Message processing done');
-            break;
-          default:
-            updateChatMessages(res.message);
-            break;
-        }
-      } catch (err) {
-        console.log('Error parsing message:', err);
-      }
-    };
-
-    socket.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
-
-    setWs(socket);
-
-    return () => {
-      socket.close();
-    };
-  }, []);
-
   const handleSend = () => {
-    if (ws) {
-      setChatMessages([
-        ...chatMessages,
-        { author: ChatRole.USER, message: promptQuery },
-      ]);
-      ws.send(promptQuery);
+    try {
+      sendUserMessage(promptQuery);
       setPromptQuery('');
+      Keyboard.dismiss();
+    } catch (e) {
+      console.log(e);
     }
   };
 
+  useEffect(() => {
+    scrollToEnd();
+  }, [chatMessages]);
+
+  if (connectionStatus === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Typography>Trying to connect..</Typography>
+      </SafeAreaView>
+    );
+  }
+
+  if (connectionStatus === 3) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Typography>Network error. Cannot connect</Typography>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <ChatList chatMessages={chatMessages} />
-      <TextInput
-        value={promptQuery}
-        onChangeText={setPromptQuery}
-        placeholder="Type your message"
-        style={styles.textInput}
+    <SafeAreaView style={styles.container}>
+      <StatusBar translucent={false} style="auto" />
+      <ChatList
+        sendMessage={sendUserMessage}
+        isLoading={isLoading}
+        ref={chatListRef}
+        chatMessages={chatMessages}
       />
-      <Button title="Send" onPress={handleSend} />
-    </View>
+      <PromptInput
+        isLoading={isLoading}
+        onChangeText={setPromptQuery}
+        promptQuery={promptQuery}
+        sendPrompt={handleSend}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
-    marginBottom: 10,
+    padding: spacings.m,
+    backgroundColor: colors.bg,
+
+    gap: spacings.l,
   },
 });
