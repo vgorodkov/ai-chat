@@ -15,6 +15,6 @@ export const Typography = ({
   const txtStyle = typographyStyles[variant];
 
   return (
-    <RNText style={[txtStyle, style, { color: color }]}>{children}</RNText>
+    <RNText style={[txtStyle, { color: color }, style]}>{children}</RNText>
   );
 };
