@@ -1,11 +1,15 @@
 import WebSocket from 'ws';
+import { HumanMessage, AIMessage } from '@langchain/core/messages';
 
-import { SessionData } from 'types/session';
+interface SessionData {
+  chatHistory: (HumanMessage | AIMessage)[];
+}
 
+const chatHistory: (HumanMessage | AIMessage)[] = [];
 const sessions = new Map<WebSocket, SessionData>();
 
 export const initializeSession = (ws: WebSocket): void => {
-  sessions.set(ws, { sessionHistory: [] });
+  sessions.set(ws, { chatHistory: chatHistory });
 };
 
 export const getSession = (ws: WebSocket): SessionData | undefined => {
@@ -20,10 +24,20 @@ export const deleteSession = (ws: WebSocket): void => {
   sessions.delete(ws);
 };
 
-export const appendToSessionHistory = (ws: WebSocket, entry: string): void => {
+export const appendToChatHistory = (
+  ws: WebSocket,
+  entry: HumanMessage | AIMessage
+): void => {
   const session = getSession(ws);
   if (session) {
-    session.sessionHistory.push(entry);
+    session.chatHistory.push(entry);
     updateSession(ws, session);
   }
+};
+
+export const getChatHistory = (
+  ws: WebSocket
+): (HumanMessage | AIMessage)[] | undefined => {
+  const session = getSession(ws);
+  return session?.chatHistory;
 };

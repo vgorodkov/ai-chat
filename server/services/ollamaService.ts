@@ -1,25 +1,35 @@
 import WebSocket from 'ws';
-import { Ollama } from '@langchain/community/llms/ollama';
+import { ChatOllama } from '@langchain/community/chat_models/ollama';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { StringOutputParser } from '@langchain/core/output_parsers';
+import { MessagesPlaceholder } from '@langchain/core/prompts';
+import { AIMessage } from '@langchain/core/messages';
 import { sendToClient } from 'utils/sendToClient';
-import { appendToSessionHistory } from './sessionService';
+import { appendToChatHistory, getChatHistory } from './sessionService';
 
-const ollama = new Ollama({
+const chatModel = new ChatOllama({
   baseUrl: 'http://localhost:11434',
   model: 'llama3',
-  temperature: 0.3,
-  stop: ['User:'],
 });
+const outputParser = new StringOutputParser();
 
-export const getAIResponseStream = async (fullPrompt: string) => {
-  return await ollama.stream(fullPrompt);
-};
+const historyAwarePrompt = ChatPromptTemplate.fromMessages([
+  new MessagesPlaceholder('chat_history'),
+  ['user', '{input}'],
+]);
+
+const llmChain = historyAwarePrompt.pipe(chatModel).pipe(outputParser);
 
 export const processAIResponse = async (
   ws: WebSocket,
   prompt: string
 ): Promise<void> => {
-  const stream = await getAIResponseStream(prompt);
-  let responseChunks: string[] = [];
+  const chatHistory = getChatHistory(ws);
+  const responseChunks = [];
+  const stream = await llmChain.stream({
+    input: prompt,
+    chat_history: chatHistory,
+  });
 
   for await (const chunk of stream) {
     responseChunks.push(chunk);
@@ -34,5 +44,5 @@ export const processAIResponse = async (
     sendToClient(ws, { event: 'DONE' });
   }
 
-  appendToSessionHistory(ws, `AI: ${responseChunks.join('')}`);
+  appendToChatHistory(ws, new AIMessage(responseChunks.join('')));
 };
